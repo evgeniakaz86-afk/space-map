@@ -19,5 +19,9 @@
     "panoramit": "^0.0.4",
     "sharp": "^0.33.4",
     "uuid": "^9.0.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.9.0": true,
+    "sharp@0.33.5": true
   }
 }

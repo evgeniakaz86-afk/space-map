@@ -5,6 +5,7 @@ let panoramas = [];
 let stats = { views: 0, pointClicks: {} };
 let currentLocId = null;
 let currentFloor = 1;
+let cameraPhotos = [];
 
 const planImg = document.getElementById('planImg');
 const mapArea = document.getElementById('mapArea');
@@ -13,9 +14,7 @@ const endPoint = document.getElementById('endPoint');
 const locSelect = document.getElementById('locSelect');
 const floorSelect = document.getElementById('floorSelect');
 
-// ==========================================
 // --- УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО ---
-// ==========================================
 function openModal(title, inputs, onConfirm) {
     const modal = document.getElementById('customModal');
     const modalTitle = document.getElementById('modalTitle');
@@ -59,11 +58,7 @@ window.onload = function () {
     document.getElementById('imageLoader').addEventListener('change', function (e) {
         const file = e.target.files[0];
         if (!file) return;
-
-        if (!currentLocId) {
-            alert('Сначала создайте локацию!');
-            return;
-        }
+        if (!currentLocId) { alert('Сначала создайте локацию!'); return; }
 
         const reader = new FileReader();
         reader.onload = function (event) {
@@ -71,7 +66,6 @@ window.onload = function () {
             img.onload = function () {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-
                 const MAX_SIZE = 1000;
                 let width = img.width;
                 let height = img.height;
@@ -80,18 +74,13 @@ window.onload = function () {
                 } else if (height > MAX_SIZE) {
                     width *= MAX_SIZE / height; height = MAX_SIZE;
                 }
-
-                canvas.width = width;
-                canvas.height = height;
+                canvas.width = width; canvas.height = height;
                 ctx.drawImage(img, 0, 0, width, height);
-
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
                 planImg.src = compressedBase64;
-
                 const loc = locations.find(l => l.id === currentLocId);
                 if (!loc.plans) loc.plans = {};
                 loc.plans[currentFloor] = compressedBase64;
-
                 renderPoints();
                 saveState();
             };
@@ -153,7 +142,6 @@ function addLocation() {
 function editLocation() {
     if (!currentLocId) return alert('Локация не выбрана!');
     const loc = locations.find(l => l.id === currentLocId);
-
     openModal('Изменить локацию', [
         { id: 'locName', placeholder: 'Название', type: 'text', value: loc.name },
         { id: 'locFloors', placeholder: 'Количество этажей', type: 'number', value: loc.floors }
@@ -176,7 +164,6 @@ function editLocation() {
 function deleteLocation() {
     if (!currentLocId) return alert('Локация не выбрана!');
     const loc = locations.find(l => l.id === currentLocId);
-
     openModal('Удалить локацию?', [
         { id: 'dummy', placeholder: `Удалить "${loc.name}"?`, type: 'text', value: 'Да, удалить' }
     ], () => {
@@ -244,32 +231,26 @@ function autoGeneratePlan() {
     if (!imgSrc || imgSrc.includes('R0lGODlhAQABAIAAAAAAAP')) {
         return alert('Сначала загрузите картинку плана!');
     }
-
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     img.src = imgSrc;
-
     img.onload = () => {
         canvas.width = 800; canvas.height = 800;
         const cropSize = Math.min(img.width, img.height);
         const startX = (img.width - cropSize) / 2;
         const startY = (img.height - cropSize) / 2;
-
         ctx.drawImage(img, startX, startY, cropSize, cropSize, 0, 0, 800, 800);
         ctx.filter = 'grayscale(100%) contrast(150%)';
         ctx.drawImage(img, startX, startY, cropSize, cropSize, 0, 0, 800, 800);
         ctx.filter = 'none';
-
         const newPlan = canvas.toDataURL('image/png');
         planImg.src = newPlan;
-
         const loc = locations.find(l => l.id === currentLocId);
         if (loc) {
             if (!loc.plans) loc.plans = {};
             loc.plans[currentFloor] = newPlan;
         }
-
         renderPoints();
         saveState();
         alert('Схема сгенерирована!');
@@ -347,13 +328,10 @@ function drawRoute() {
     const s = points.find(p => p.id == startPoint.value);
     const e = points.find(p => p.id == endPoint.value);
     if (!s || !e) return alert('Выберите две точки!');
-
     const rect = planImg.getBoundingClientRect();
     if (rect.width === 0) return alert('Сначала загрузите картинку плана!');
-
     const img = new Image();
     img.src = planImg.src;
-
     img.onload = () => {
         const smallCanvas = document.createElement('canvas');
         const scale = 0.5;
@@ -361,15 +339,12 @@ function drawRoute() {
         smallCanvas.height = rect.height * scale;
         const sCtx = smallCanvas.getContext('2d');
         sCtx.drawImage(img, 0, 0, smallCanvas.width, smallCanvas.height);
-
         const imageData = sCtx.getImageData(0, 0, smallCanvas.width, smallCanvas.height).data;
         const sw = smallCanvas.width;
         const sh = smallCanvas.height;
-
         const gridSize = 2;
         const cols = Math.ceil(sw / gridSize);
         const rows = Math.ceil(sh / gridSize);
-
         let rawWalls = Array(rows).fill().map(() => Array(cols).fill(false));
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
@@ -380,10 +355,8 @@ function drawRoute() {
                 if (brightness < 200) rawWalls[r][c] = true;
             }
         }
-
         const safeGrid = JSON.parse(JSON.stringify(rawWalls));
         const thickness = 2;
-
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 if (rawWalls[r][c]) {
@@ -398,10 +371,8 @@ function drawRoute() {
                 }
             }
         }
-
         const distToWall = Array(rows).fill().map(() => Array(cols).fill(999));
         const queue = [];
-
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 if (rawWalls[r][c]) {
@@ -410,7 +381,6 @@ function drawRoute() {
                 }
             }
         }
-
         const dirs = [{ dr: 1, dc: 0 }, { dr: -1, dc: 0 }, { dr: 0, dc: 1 }, { dr: 0, dc: -1 }];
         while (queue.length > 0) {
             const curr = queue.shift();
@@ -425,10 +395,8 @@ function drawRoute() {
                 }
             }
         }
-
         const startCell = { c: Math.round(((s.x / 100) * sw) / gridSize), r: Math.round(((s.y / 100) * sh) / gridSize) };
         const endCell = { c: Math.round(((e.x / 100) * sw) / gridSize), r: Math.round(((e.y / 100) * sh) / gridSize) };
-
         for (let dr = -1; dr <= 1; dr++) {
             for (let dc = -1; dc <= 1; dc++) {
                 if (safeGrid[startCell.r + dr] && safeGrid[startCell.r + dr][startCell.c + dc] !== undefined) {
@@ -439,42 +407,32 @@ function drawRoute() {
                 }
             }
         }
-
         const openSet = [{ c: startCell.c, r: startCell.r, g: 0, f: 0, parent: null }];
         const closedSet = new Set();
         let endNode = null;
-
         const getHeuristic = (a, b) => Math.abs(a.c - b.c) + Math.abs(a.r - b.r);
-
         while (openSet.length > 0) {
             openSet.sort((a, b) => a.f - b.f);
             const current = openSet.shift();
-
             if (current.c === endCell.c && current.r === endCell.r) {
                 endNode = current;
                 break;
             }
-
             closedSet.add(`${current.c},${current.r}`);
-
             const neighbors = [
                 { c: current.c + 1, r: current.r }, { c: current.c - 1, r: current.r },
                 { c: current.c, r: current.r + 1 }, { c: current.c, r: current.r - 1 }
             ];
-
             for (const n of neighbors) {
                 if (n.c < 0 || n.c >= cols || n.r < 0 || n.r >= rows) continue;
                 if (closedSet.has(`${n.c},${n.r}`)) continue;
                 if (safeGrid[n.r][n.c]) continue;
-
                 let penalty = 0;
                 if (distToWall[n.r][n.c] < 4) {
                     penalty = (4 - distToWall[n.r][n.c]) * 5;
                 }
-
                 const gScore = current.g + 1 + penalty;
                 const fScore = gScore + getHeuristic(n, endCell);
-
                 const existing = openSet.find(o => o.c === n.c && o.r === n.r);
                 if (existing && gScore >= existing.g) continue;
                 if (existing) {
@@ -484,12 +442,9 @@ function drawRoute() {
                 }
             }
         }
-
         const svg = document.getElementById('routeSvg');
         svg.innerHTML = '';
-
         if (!endNode) return alert('Не удалось найти путь!');
-
         const pathPoints = [];
         let curr = endNode;
         while (curr) {
@@ -499,19 +454,14 @@ function drawRoute() {
             });
             curr = curr.parent;
         }
-
         pathPoints[0] = { x: (s.x / 100) * rect.width, y: (s.y / 100) * rect.height };
         pathPoints.push({ x: (e.x / 100) * rect.width, y: (e.y / 100) * rect.height });
-
         let d = `M ${pathPoints[0].x} ${pathPoints[0].y}`;
         for (let i = 1; i < pathPoints.length; i++) {
             d += ` L ${pathPoints[i].x} ${pathPoints[i].y}`;
         }
-
         svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-
         const pathGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
         const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         shadow.setAttribute('d', d);
         shadow.setAttribute('stroke', 'rgba(42, 102, 255, 0.3)');
@@ -519,7 +469,6 @@ function drawRoute() {
         shadow.setAttribute('fill', 'none');
         shadow.setAttribute('stroke-linecap', 'round');
         shadow.setAttribute('stroke-linejoin', 'round');
-
         const mainLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         mainLine.setAttribute('d', d);
         mainLine.setAttribute('stroke', '#2A66FF');
@@ -527,22 +476,18 @@ function drawRoute() {
         mainLine.setAttribute('fill', 'none');
         mainLine.setAttribute('stroke-linecap', 'round');
         mainLine.setAttribute('stroke-linejoin', 'round');
-
         const lastP = pathPoints[pathPoints.length - 1];
         const prevP = pathPoints[pathPoints.length - 2];
         const angle = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
         const arrowSize = 10;
-
         const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         const p1 = `${lastP.x - arrowSize * Math.cos(angle - Math.PI / 6)},${lastP.y - arrowSize * Math.sin(angle - Math.PI / 6)}`;
         const p2 = `${lastP.x - arrowSize * Math.cos(angle + Math.PI / 6)},${lastP.y - arrowSize * Math.sin(angle + Math.PI / 6)}`;
         arrow.setAttribute('points', `${lastP.x},${lastP.y} ${p1} ${p2}`);
         arrow.setAttribute('fill', '#2A66FF');
-
         pathGroup.appendChild(shadow);
         pathGroup.appendChild(mainLine);
         pathGroup.appendChild(arrow);
-
         svg.appendChild(pathGroup);
     };
 }
@@ -576,12 +521,10 @@ function renderPanoramaList() {
     if (!list) return;
     list.innerHTML = '';
     const locPanoramas = panoramas.filter(p => p.locId === currentLocId);
-
     if (locPanoramas.length === 0) {
         list.innerHTML = '<li>Нет панорам.</li>';
         return;
     }
-
     locPanoramas.forEach((p, index) => {
         const li = document.createElement('li');
         let options = '<option value="">Стрелка: нет</option>';
@@ -615,25 +558,22 @@ function setPanoHotspot(panoId, targetId) {
 function openPano(panoId) {
     const pano = panoramas.find(p => p.id === panoId);
     if (!pano) return;
-
     document.getElementById('panoramaView').style.display = 'block';
     const container = document.getElementById('panoContainer');
     const hotspotContainer = document.getElementById('hotspotContainer');
-    
     container.innerHTML = '<div id="pannellum-viewer" style="width:100%; height:100%;"></div>';
-
     pannellum.viewer('pannellum-viewer', {
         "type": "equirectangular",
         "panorama": pano.url,
         "autoLoad": true,
         "showControls": true,
-        "compass": true,
-        // Если это 360 панорама, склеенная сервером, даем полный обзор
-        "minPitch": -90,
-        "maxPitch": 90,
-        "hfov": 100
+        "compass": false,
+        "haov": 120,      
+        "vaov": 120,      
+        "vOffset": 0,     
+        "minPitch": -30,  
+        "maxPitch": 30
     });
-
     hotspotContainer.innerHTML = '';
     if (pano.hotspots && pano.hotspots.length > 0) {
         const targetPano = panoramas.find(p => p.id === pano.hotspots[0]);
@@ -663,137 +603,98 @@ function updateStatsUI() {
 }
 function showStats() {
     const box = document.getElementById('statsBox');
-    if (box) box.innerText = `Просмотров: ${stats.views}\nТочек: ${points.length}\nПанорам: ${panoramas.length}`;
+    if (box) box.innerText = `Просмотров: ${stats.views}\nТочек: ${points.length}`;
 }
 
 let videoStream = null;
-async function startCamera() {
+
+function startCamera() {
+    document.getElementById('instructionModal').classList.add('active');
+}
+
+function confirmStartCamera() {
+    document.getElementById('instructionModal').classList.remove('active');
+    startCameraNow();
+}
+
+async function startCameraNow() {
     try {
         videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         document.getElementById('video').srcObject = videoStream;
         document.getElementById('cameraView').style.display = 'block';
-    } catch (err) { alert('Нет доступа к камере.'); }
+        document.getElementById('cameraInstruction').style.display = 'block';
+        document.getElementById('captureControls').style.display = 'block';
+    } catch (err) { alert('Нет доступа к камере. Убедитесь, что вы открываете сайт по HTTPS.'); }
 }
+
 function stopCamera() {
     if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
     document.getElementById('cameraView').style.display = 'none';
+    document.getElementById('cameraInstruction').style.display = 'none';
+    document.getElementById('captureControls').style.display = 'none';
 }
 
-// --- ЛОГИКА КРУГОВОЙ СЪЕМКИ 360 ---
-let capturedPhotos = [];
-let isCapturing = false;
-
-async function startPanoCapture() {
-    if (isCapturing) return;
-    if (!currentLocId) return alert('Сначала создайте локацию!');
+function takePhoto() {
+    const video = document.getElementById('video');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
     
-    isCapturing = true;
-    capturedPhotos = [];
-    const statusDiv = document.getElementById('captureStatus');
-    const shutterBtn = document.getElementById('shutterBtn');
-    
-    statusDiv.style.display = 'block';
-    shutterBtn.style.backgroundColor = 'red';
-    shutterBtn.innerHTML = 'Стоп';
-
-    const totalShots = 8;
-    
-    for (let i = 0; i < totalShots; i++) {
-        if (!isCapturing) break;
-
-        statusDiv.innerText = `Снимок ${i + 1} из ${totalShots}. Поворачивайтесь...`;
-        
-        const flash = document.createElement('div');
-        flash.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:white;opacity:0.8;z-index:99;transition:opacity 0.2s;';
-        document.getElementById('cameraView').appendChild(flash);
-        setTimeout(() => flash.remove(), 100);
-
-        const video = document.getElementById('video');
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth; 
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        
-        canvas.toBlob((blob) => {
-            if (blob) capturedPhotos.push(blob);
-        }, 'image/jpeg', 0.9);
-
-        await new Promise(r => setTimeout(r, 2000));
-    }
-
-    isCapturing = false;
-    statusDiv.style.display = 'none';
-    shutterBtn.style.backgroundColor = '';
-    shutterBtn.innerHTML = 'Старт<br>360';
-
-    if (capturedPhotos.length >= 2) {
-        statusDiv.style.display = 'block';
-        statusDiv.innerText = 'Склеиваем панораму на сервере...';
-        await uploadAndStitchPano(capturedPhotos);
-    }
+    canvas.toBlob((blob) => {
+        cameraPhotos.push(blob);
+        document.getElementById('photoCount').innerText = cameraPhotos.length;
+        alert("Кадр " + cameraPhotos.length + " добавлен в очередь!");
+    }, 'image/jpeg', 0.9);
 }
 
-async function uploadAndStitchPano(blobs) {
-    const formData = new FormData();
-    blobs.forEach((blob, index) => {
-        formData.append('photos', blob, `shot_${index}.jpg`);
-    });
-
+async function finishAndStitch() {
+    if (cameraPhotos.length < 2) return alert('Сделайте хотя бы 2 кадра для склейки!');
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerText = 'Склеиваю...';
     try {
-        const response = await fetch('/api/stitch', {
-            method: 'POST',
-            body: formData
-        });
-
+        const formData = new FormData();
+        cameraPhotos.forEach((blob, i) => formData.append('photos', blob, 'photo_' + i + '.jpg'));
+        const response = await fetch('/api/stitch', { method: 'POST', body: formData });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
-
-        panoramas.push({
-            id: 'pano_360_' + Date.now(),
-            locId: currentLocId,
-            name: 'Панорама 360°',
-            url: result.url,
-            hotspots: []
-        });
-
+        
+        panoramas.push({ id: 'pano_' + Date.now(), locId: currentLocId, name: 'Панорама с камеры', url: result.url, hotspots: [] });
         renderPanoramaList();
         saveState();
-        alert('Панорама 360° успешно создана!');
         
-    } catch (error) {
-        console.error(error);
-        alert('Ошибка склейки: ' + error.message);
+        cameraPhotos = [];
+        document.getElementById('photoCount').innerText = 0;
+        alert('Панорама успешно склеена!');
+    } catch (e) {
+        alert('Ошибка склейки: ' + e.message);
     } finally {
-        document.getElementById('captureStatus').style.display = 'none';
+        btn.disabled = false;
+        btn.innerText = '✨ Завершить и склеить';
     }
 }
 
-// --- СКЛЕЙКА ПАНОРАМ ИЗ ФАЙЛОВ (Кнопка в меню) ---
+// --- СКЛЕЙКА ЗАГРУЖЕННЫХ ФАЙЛОВ (старая кнопка) ---
 async function stitchPanorama() {
     const files = document.getElementById('panoLoader').files;
     if (!files || files.length < 2) {
         return alert('Выберите минимум 2 фото для склейки.');
     }
-
     const btn = event.target;
     const originalText = btn.innerText;
     btn.innerText = 'Склеиваю...';
     btn.disabled = true;
-
     try {
         const formData = new FormData();
         for (const file of files) {
             formData.append('photos', file);
         }
-
         const response = await fetch('/api/stitch', {
             method: 'POST',
             body: formData
         });
-
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
-
         panoramas.push({
             id: 'pano_stitched_' + Date.now(),
             locId: currentLocId,
@@ -801,11 +702,9 @@ async function stitchPanorama() {
             url: result.url,
             hotspots: []
         });
-
         renderPanoramaList();
         saveState();
         alert('Панорама склеена на сервере!');
-
     } catch (error) {
         console.error(error);
         alert('Ошибка склейки: ' + error.message);
@@ -818,42 +717,24 @@ async function stitchPanorama() {
 // --- ПУБЛИКАЦИЯ КАРТЫ ---
 async function publishMap() {
     if (!currentLocId) return alert('Сначала создайте хотя бы одну локацию и добавьте точки!');
-
     const publishedData = {
-        locations: locations.map(l => ({
-            id: l.id,
-            name: l.name,
-            floors: l.floors,
-            plans: l.plans
-        })),
+        locations: locations.map(l => ({ id: l.id, name: l.name, floors: l.floors, plans: l.plans })),
         points: points,
-        panoramas: panoramas.map(p => ({
-            id: p.id,
-            locId: p.locId,
-            name: p.name,
-            url: p.url,
-            hotspots: p.hotspots || []
-        }))
+        panoramas: panoramas.map(p => ({ id: p.id, locId: p.locId, name: p.name, url: p.url, hotspots: p.hotspots || [] }))
     };
-
     try {
         const response = await fetch('/api/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(publishedData)
         });
-
         const result = await response.json();
-
         if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
-
         const link = `${window.location.origin}/viewer.html?map=${result.mapId}`;
-
         const linkElement = document.getElementById('publishLink');
         if (linkElement) {
             linkElement.innerHTML = `✅ Карта опубликована! Ссылка: <br><a href="${link}" target="_blank" style="color: #60A5FA;">${link}</a>`;
         }
-
         alert('Карта опубликована! Теперь ссылка работает на любом устройстве.');
     } catch (e) {
         console.error(e);
@@ -866,9 +747,7 @@ function copyLink() {
     if (!linkElement || !linkElement.querySelector('a')) {
         return alert('Сначала опубликуйте карту (нажмите "Опубликовать карту").');
     }
-
     const link = linkElement.querySelector('a').href;
-
     navigator.clipboard.writeText(link).then(() => {
         alert('Ссылка скопирована в буфер обмена!');
     }).catch(err => {
@@ -890,56 +769,33 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.style.setProperty('--mouse-y', `${y}px`);
         });
     });
-
     document.addEventListener('click', function (e) {
         const button = e.target.closest('button, .btn');
         if (!button) return;
-
         const circle = document.createElement('span');
         const diameter = Math.max(button.clientWidth, button.clientHeight);
         const radius = diameter / 2;
-
         const rect = button.getBoundingClientRect();
-
         circle.style.width = circle.style.height = `${diameter}px`;
         circle.style.left = `${e.clientX - rect.left - radius}px`;
         circle.style.top = `${e.clientY - rect.top - radius}px`;
         circle.classList.add('ripple');
-
         const ripple = button.querySelector('.ripple');
         if (ripple) ripple.remove();
-
         button.appendChild(circle);
-
-        setTimeout(() => {
-            circle.remove();
-        }, 600);
+        setTimeout(() => { circle.remove(); }, 600);
     });
-
     const canvas = document.getElementById('bg-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-
     let width, height;
     let particles = [];
     let mouse = { x: null, y: null, radius: 200 };
-
-    window.addEventListener('mousemove', (e) => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
-    });
-    window.addEventListener('mouseleave', () => {
-        mouse.x = null;
-        mouse.y = null;
-    });
-
-    function resize() {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
-    }
+    window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener('mouseleave', () => { mouse.x = null; mouse.y = null; });
+    function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
-
     class Particle {
         constructor() {
             this.x = Math.random() * width;
@@ -951,10 +807,8 @@ document.addEventListener('DOMContentLoaded', () => {
         update() {
             this.x += this.vx;
             this.y += this.vy;
-
             if (this.x < 0 || this.x > width) this.vx *= -1;
             if (this.y < 0 || this.y > height) this.vy *= -1;
-
             if (mouse.x != null) {
                 let dx = mouse.x - this.x;
                 let dy = mouse.y - this.y;
@@ -978,26 +832,16 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 0;
         }
     }
-
-    for (let i = 0; i < 100; i++) {
-        particles.push(new Particle());
-    }
-
+    for (let i = 0; i < 100; i++) { particles.push(new Particle()); }
     function animate() {
         ctx.clearRect(0, 0, width, height);
-
-        particles.forEach(p => {
-            p.update();
-            p.draw();
-        });
-
+        particles.forEach(p => { p.update(); p.draw(); });
         ctx.lineWidth = 1.5;
         for (let i = 0; i < particles.length; i++) {
             for (let j = i + 1; j < particles.length; j++) {
                 const dx = particles[i].x - particles[j].x;
                 const dy = particles[i].y - particles[j].y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-
                 if (dist < 180) {
                     const opacity = 1 - (dist / 180);
                     ctx.strokeStyle = `rgba(96, 165, 250, ${opacity * 0.6})`;
@@ -1025,12 +869,14 @@ window.setPanoHotspot = setPanoHotspot;
 window.openPano = openPano;
 window.closePano = closePano;
 window.startCamera = startCamera;
+window.confirmStartCamera = confirmStartCamera;
 window.stopCamera = stopCamera;
+window.takePhoto = takePhoto;
+window.finishAndStitch = finishAndStitch;
+window.stitchPanorama = stitchPanorama;
 window.drawRoute = drawRoute;
 window.clearRoute = clearRoute;
 window.showStats = showStats;
 window.closeModal = closeModal;
-window.stitchPanorama = stitchPanorama;
 window.publishMap = publishMap;
 window.copyLink = copyLink;
-window.startPanoCapture = startPanoCapture; // Экспорт новой функции

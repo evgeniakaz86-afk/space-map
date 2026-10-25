@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Пространство | Интерактивные карты</title>
-    
-    <!-- ✅ Подключаем Pannellum для 3D-панорам -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-    
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -20,22 +17,16 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                 <span>Карта Пространства</span>
             </div>
-            <div class="header-actions">
-                <span class="badge">v2.0</span>
-            </div>
+            <div class="header-actions"><span class="badge">v2.0</span></div>
         </header>
 
         <main class="app-main">
             <!-- БЛОК 1: 2D-КАРТА -->
             <section class="glass-panel">
-                <div class="panel-header">
-                    <h2>1. 2D-Схема (Локации и Этажи)</h2>
-                </div>
-                
+                <div class="panel-header"><h2>1. 2D-Схема (Локации и Этажи)</h2></div>
                 <div class="toolbar">
                     <select id="locSelect" onchange="switchLoc()" class="custom-select"></select>
                     <select id="floorSelect" onchange="switchFloor()" class="custom-select"></select>
-                    
                     <div class="toolbar-group">
                         <button onclick="addLocation()" class="btn btn-secondary">+ Добавить</button>
                         <button onclick="editLocation()" class="btn btn-secondary">✎ Изменить</button>
@@ -77,7 +68,6 @@
                     </div>
                 </div>
 
-                <!-- БЛОК ПУБЛИКАЦИИ -->
                 <div class="toolbar" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--glass-border);">
                     <button onclick="publishMap()" class="btn btn-success" style="background: #10B981;">🚀 Опубликовать карту</button>
                     <button onclick="copyLink()" class="btn btn-secondary">📋 Скопировать ссылку</button>
@@ -87,9 +77,7 @@
 
             <!-- БЛОК 2: 3D-ПАНОРАМЫ -->
             <section class="glass-panel">
-                <div class="panel-header">
-                    <h2>2. 3D Панорамы</h2>
-                </div>
+                <div class="panel-header"><h2>2. 3D Панорамы</h2></div>
                 <div class="toolbar">
                     <label class="file-upload">
                         <input type="file" id="panoLoader" accept="image/*" multiple>
@@ -106,34 +94,39 @@
                     <button onclick="startCamera()" class="btn btn-secondary">Включить камеру</button>
                     <button onclick="stopCamera()" class="btn btn-secondary">Выключить</button>
                 </div>
+                
+                <p class="hint-text" id="cameraInstruction" style="display:none; color: #60A5FA; font-weight: bold; margin-top: 12px;">
+                    Наведите камеру на объект и нажмите кнопку «Сделать фото» ниже. Сделайте несколько кадров с перекрытием, затем нажмите «Завершить и склеить».
+                </p>
+
                 <div id="cameraView" class="camera-container">
                     <video id="video" autoplay playsinline></video>
-                    <!-- Обновленная кнопка затвора для 360 съемки -->
-                    <div class="shutter" id="shutterBtn" onclick="startPanoCapture()" style="display: flex; align-items: center; justify-content: center; color: black; font-weight: bold; font-size: 12px; text-align: center;">Старт<br>360</div>
-                    <!-- Индикатор статуса съемки -->
-                    <div id="captureStatus" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 10px; display: none; white-space: nowrap; z-index: 100;"></div>
+                </div>
+                
+                <div id="captureControls" style="display:none; margin-top: 12px;">
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="takePhoto()" class="btn btn-primary" style="flex:1;">📸 Сделать фото (<span id="photoCount">0</span>)</button>
+                        <button onclick="finishAndStitch()" class="btn btn-success" style="flex:1; background:#10B981;">✨ Завершить и склеить</button>
+                    </div>
                 </div>
             </section>
 
             <!-- БЛОК 3: СТАТИСТИКА -->
             <section class="glass-panel">
-                <div class="panel-header">
-                    <h2>3. Статистика</h2>
-                </div>
+                <div class="panel-header"><h2>3. Статистика</h2></div>
                 <button onclick="showStats()" class="btn btn-secondary">Обновить данные</button>
                 <pre id="statsBox" class="stats-terminal">Нажмите кнопку для загрузки...</pre>
             </section>
         </main>
     </div>
 
-    <!-- 3D ОКНО (Теперь с Pannellum) -->
     <div id="panoramaView">
         <button class="close-pano" onclick="closePano()">Закрыть 3D</button>
         <div id="panoContainer"></div>
         <div id="hotspotContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100;"></div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО -->
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ИНСТРУКЦИИ -->
     <div id="customModal" class="modal-overlay">
         <div class="modal-window">
             <h3 id="modalTitle">Введите данные</h3>
@@ -145,7 +138,22 @@
         </div>
     </div>
 
-    <!-- Подключаем app.js как модуль -->
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ИНСТРУКЦИИ ПЕРЕД СЪЕМКОЙ -->
+    <div id="instructionModal" class="modal-overlay">
+        <div class="modal-window">
+            <h3>📸 Инструкция для съемки</h3>
+            <p style="margin-bottom: 15px; color: #ccc; font-size: 14px;">
+                1. Стойте строго на месте (не делайте шаг в сторону).<br>
+                2. Поворачивайтесь вокруг своей оси, делая снимки.<br>
+                3. Каждый кадр должен перекрывать предыдущий на 30-40%.<br>
+                4. Держите телефон ровно (без сильных наклонов вверх/вниз).
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="confirmStartCamera()">Понятно, начать!</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/app.js"></script>
 </body>
 </html>

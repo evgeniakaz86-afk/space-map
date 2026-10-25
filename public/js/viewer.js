@@ -29,6 +29,7 @@ window.onload = async function () {
         const data = await api('/api/public/maps/' + mapId);
         mapData = data;
 
+        // Если есть здания, формируем локации
         if (data.buildings && data.buildings.length > 0) {
             const mainLoc = {
                 id: 'main',
@@ -39,21 +40,28 @@ window.onload = async function () {
             for (let i = 2; i <= (data.floors || 1); i++) {
                 mainLoc.plans[i] = data.plan_url;
             }
-
             mapData.locations = [mainLoc];
-            mapData.points = (data.points || []).map(p => ({
-                ...p,
-                locId: 'main',
-                floor: p.floor || 1
-            }));
-            mapData.panoramas = (data.panoramas || []).map(p => ({
-                ...p,
-                locId: 'main',
-                hotspots: []
-            }));
         } else {
-            throw new Error('На карте нет данных');
+            // Если зданий нет, но есть панорамы, делаем одну локацию "По умолчанию"
+            mapData.locations = [{
+                id: 'main',
+                name: data.title || 'Обзор',
+                floors: 1,
+                plans: { 1: data.plan_url || '' }
+            }];
         }
+
+        // Привязываем точки и панорамы к локации 'main'
+        mapData.points = (data.points || []).map(p => ({
+            ...p,
+            locId: 'main',
+            floor: p.floor || 1
+        }));
+        mapData.panoramas = (data.panoramas || []).map(p => ({
+            ...p,
+            locId: 'main',
+            hotspots: []
+        }));
 
         if (mapData.locations.length > 0) {
             currentLocId = mapData.locations[0].id;
@@ -416,7 +424,6 @@ function openPano(panoId) {
 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        // ✅ Камера строго в центре сферы
         camera.position.set(0, 0, 0);
 
         const geo = new THREE.SphereGeometry(500, 64, 64);
@@ -471,7 +478,6 @@ function openPano(panoId) {
 
     camera.rotation.set(0, 0, 0);
 
-    // ✅ Загрузка текстуры с колбэком
     const loader = new THREE.TextureLoader();
     loader.load(
         pano.url,

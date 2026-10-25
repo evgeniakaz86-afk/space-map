@@ -6,27 +6,17 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { db } from './db.js';
+import { autoPlanFromImage, build3DFromPhotos } from './vision.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// Безопасный импорт vision.js (чтобы сервер не падал, если wopencv сломается)
-let autoPlanFromImage, build3DFromPhotos;
-try {
-    const vision = await import('./vision.js');
-    autoPlanFromImage = vision.autoPlanFromImage;
-    build3DFromPhotos = vision.build3DFromPhotos;
-    console.log('✅ Модуль vision.js успешно загружен');
-} catch (e) {
-    console.error('⚠️ ОШИБКА ЗАГРУЗКИ vision.js:', e.message);
-    console.error('Сервер запустится, но функции склейки панорам будут недоступны.');
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const SECRET = process.env.SECRET || 'demo-secret-change-me';
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 25 * 1024 * 1024 } });
+// Разрешаем загружать файлы до 50 мегабайт
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
 
 app.use(compression());
 app.use(express.json({ limit: '50mb' }));
@@ -35,10 +25,7 @@ app.use(cookieParser());
 // 1. Отдаем статику (public)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 2. Раздаем папку node_modules 
-app.use('/node_modules', express.static(path.join(__dirname, 'node_modules')));
-
-// 3. Раздаем папку uploads (для загруженных файлов)
+// 2. Раздаем папку uploads (для загруженных файлов)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- ЗАЩИТА ДОСТУПА ---
@@ -71,17 +58,18 @@ app.post('/api/logout', (req, res) => { res.clearCookie('token'); res.json({ ok:
 app.get('/api/me', auth, (req, res) => res.json(req.user));
 
 // --- СКЛЕЙКА ПАНОРАМ НА СЕРВЕРЕ ---
-app.post('/api/stitch', upload.array('photos', 12), async (req, res) => {
+app.post('/api/stitch', upload.array('photos', 50), async (req, res) => {
     try {
         const files = req.files;
         if (!files || files.length < 2) return res.status(400).json({ error: 'need 2+ photos' });
-        if (!build3DFromPhotos) return res.status(500).json({ error: 'vision module not loaded' });
         
+        const { build3DFromPhotos } = await import('./vision.js');
         const out = await build3DFromPhotos(files.map(f => f.path), 'uploads');
-        res.json({ url: '/uploads/' + out }); // ВАЖНО: добавляем /uploads/
+        // Возвращаем правильный URL
+        res.json({ url: '/uploads/' + path.basename(out) });
     } catch (e) {
-        console.error('Stitch error:', e);
-        res.status(500).json({ error: 'stitch_error', details: e.message });
+        console.error(e);
+        res.status(500).json({ error: 'stitch_error' });
     }
 });
 
@@ -146,22 +134,28 @@ app.post('/api/maps/:id/panoramas', auth, upload.single('panorama'), (req, res) 
   const m = db.prepare('SELECT * FROM maps WHERE id=? AND owner_id=?').get(req.params.id, req.user.id);
   if (!m) return res.status(403).json({ error: 'forbidden' });
   const id = uuid().slice(0, 8);
-  const { x, y, floor, building_id } = req.body;
-  db.prepare('INSERT INTO panoramas(id,map_id,building_id,floor,url,x,y) VALUES(?,?,?,?,?,?,?)')
-    .run(id, m.id, building_id || null, floor || 1, '/uploads/' + req.file.filename, x || 0, y || 0);
+  const { x, y, floor, building_id, name } = req.body;
+  db.prepare('INSERT INTO panoramas(id,map_id,building_id,floor,url,x,y,name) VALUES(?,?,?,?,?,?,?,?)')
+    .run(id, m.id, building_id || null, floor || 1, '/uploads/' + req.file.filename, x || 0, y || 0, name || 'Панорама');
   res.json({ id });
+});
+
+// --- УДАЛЕНИЕ ПАНОРАМЫ ---
+app.delete('/api/panoramas/:id', auth, (req, res) => {
+  const p = db.prepare('SELECT p.*, m.owner_id FROM panoramas p JOIN maps m ON m.id=p.map_id WHERE p.id=?').get(req.params.id);
+  if (!p || p.owner_id !== req.user.id) return res.status(403).json({ error: 'forbidden' });
+  db.prepare('DELETE FROM panoramas WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 // --- АВТОСОЗДАНИЕ 2D-ПЛАНА ---
 app.post('/api/maps/:id/auto-plan', auth, upload.single('image'), async (req, res) => {
   const m = db.prepare('SELECT * FROM maps WHERE id=? AND owner_id=?').get(req.params.id, req.user.id);
   if (!m) return res.status(403).json({ error: 'forbidden' });
-  if (!autoPlanFromImage) return res.status(500).json({ error: 'vision module not loaded' });
-  
   try {
     const out = await autoPlanFromImage(req.file.path, 'uploads');
-    db.prepare('UPDATE maps SET plan_url=? WHERE id=?').run('/uploads/' + out, m.id);
-    res.json({ plan: '/uploads/' + out });
+    db.prepare('UPDATE maps SET plan_url=? WHERE id=?').run('/uploads/' + path.basename(out), m.id);
+    res.json({ plan: '/uploads/' + path.basename(out) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'image_error' });
@@ -169,17 +163,16 @@ app.post('/api/maps/:id/auto-plan', auth, upload.single('image'), async (req, re
 });
 
 // --- 3D-МОДЕЛЬ ---
-app.post('/api/maps/:id/3d', auth, upload.array('photos', 12), async (req, res) => {
+app.post('/api/maps/:id/3d', auth, upload.array('photos', 50), async (req, res) => {
   const m = db.prepare('SELECT * FROM maps WHERE id=? AND owner_id=?').get(req.params.id, req.user.id);
   if (!m) return res.status(403).json({ error: 'forbidden' });
-  if (!build3DFromPhotos) return res.status(500).json({ error: 'vision module not loaded' });
-  
   try {
     const out = await build3DFromPhotos(req.files.map(f => f.path), 'uploads');
     const id = uuid().slice(0, 8);
-    db.prepare('INSERT INTO panoramas(id,map_id,url,is3d) VALUES(?,?,?,1)')
-      .run(id, m.id, '/uploads/' + out);
-    res.json({ url: '/uploads/' + out });
+    const panoName = req.body.name || '3D Панорама';
+    db.prepare('INSERT INTO panoramas(id,map_id,url,is3d,name) VALUES(?,?,?,1,?)')
+      .run(id, m.id, '/uploads/' + path.basename(out), panoName);
+    res.json({ url: '/uploads/' + path.basename(out) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: '3d_error' });
@@ -225,6 +218,7 @@ app.get('/api/public/maps/:id', (req, res) => {
   res.json(m);
 });
 
+// --- СТАТИСТИКА ---
 app.post('/api/public/maps/:id/stats', (req, res) => {
   db.prepare('INSERT INTO stats(map_id,point_id,event) VALUES(?,?,?)')
     .run(req.params.id, req.body.point_id || null, req.body.event || 'view');
@@ -239,7 +233,7 @@ app.get('/api/maps/:id/stats', auth, (req, res) => {
   res.json({ total, rows });
 });
 
-// --- ПРЯМЫЕ МАРШРУТЫ ДЛЯ HTML ---
+// --- СТАТИЧЕСКИЕ СТРАНИЦЫ ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/editor.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'editor.html')));
@@ -248,21 +242,8 @@ app.get('/viewer.html', (req, res) => res.sendFile(path.join(__dirname, 'public'
 // --- ОБРАБОТКА ОШИБОК ---
 app.use((err, req, res, next) => {
   console.error('SERVER ERROR:', err);
-  res.status(500).json({ error: 'server_error', details: err.message });
+  res.status(500).json({ error: 'server_error' });
 });
 
-// --- ЗАПУСК СЕРВЕРА ---
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`=========================================`);
-    console.log(`✅ Сервер запущен: http://localhost:${PORT}`);
-    console.log(`📱 Для телефона (в той же Wi-Fi): http://<ВАШ_IP>:${PORT}`);
-    console.log(`=========================================`);
-}).on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(`❌ ОШИБКА: Порт ${PORT} уже занят другой программой!`);
-        console.error(`Закройте старое окно CMD или перезагрузите компьютер.`);
-    } else {
-        console.error('❌ Ошибка при запуске сервера:', err);
-    }
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Сервер запущен: http://localhost:${PORT}`));
