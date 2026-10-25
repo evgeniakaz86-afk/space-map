@@ -1,0 +1,6 @@
+node_modules/
+uploads/
+spacemap.db
+spacemap.db-wal
+spacemap.db-shm
+*.pem

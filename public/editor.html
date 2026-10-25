@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Редактор</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <b>Редактор</b>
+  <a href="index.html">←</a>
+  <button onclick="logout()" class="ghost">Выйти</button>
+</header>
+
+<main>
+  <section id="work" hidden>
+    <h2>Мои карты</h2>
+    <form class="row" onsubmit="event.preventDefault();createMap()">
+      <input id="title" placeholder="Название карты">
+      <input id="floors" type="number" value="1" min="1" style="width:80px">
+      <button type="submit">Создать</button>
+    </form>
+    <ul id="mapList" class="list"></ul>
+
+    <div id="editor" hidden>
+      <h3><span id="curTitle"></span></h3>
+
+      <fieldset>
+        <legend>План</legend>
+        <div class="row">
+          <input type="file" id="planFile" accept="image/*">
+          <button onclick="uploadPlan()">Загрузить план</button>
+        </div>
+        <div class="row">
+          <input type="file" id="autoFile" accept="image/*">
+          <button onclick="autoPlan()">Автосоздать план</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Здание</legend>
+        <div class="row">
+          <input id="bName" placeholder="Название здания">
+          <button onclick="addBuilding()">Добавить</button>
+        </div>
+        <ul id="bList" class="list"></ul>
+      </fieldset>
+
+      <fieldset>
+        <legend>Этаж</legend>
+        <input id="floorIn" type="number" value="1" min="1" style="width:80px">
+      </fieldset>
+
+      <div id="canvasWrap">
+        <img id="planImg" alt="План" loading="lazy">
+        <svg id="overlay" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div id="pointForm" class="panel" hidden>
+        <input id="pName" placeholder="Название">
+        <input id="pCat" placeholder="Категория">
+        <textarea id="pDesc" placeholder="Описание"></textarea>
+        <label><input type="checkbox" id="pWifi"> Wi-Fi</label>
+        <div class="row">
+          <button onclick="savePoint()">Сохранить</button>
+          <button onclick="cancelPoint()" class="ghost">Отмена</button>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend>Панорамы</legend>
+        <div class="row">
+          <input type="file" id="panFile" accept="image/*">
+          <input id="panX" placeholder="x" style="width:60px">
+          <input id="panY" placeholder="y" style="width:60px">
+          <button onclick="uploadPanorama()">Загрузить</button>
+        </div>
+        <div class="row">
+          <input type="file" id="photos3d" accept="image/*" multiple>
+          <button onclick="build3D()">Собрать 3D</button>
+        </div>
+      </fieldset>
+
+      <div class="row">
+        <button onclick="publish()">Опубликовать</button>
+      </div>
+      <div id="pubLink" class="panel"></div>
+
+      <fieldset>
+        <legend>Статистика</legend>
+        <button onclick="loadStats()">Показать</button>
+        <pre id="statsOut"></pre>
+      </fieldset>
+    </div>
+  </section>
+</main>
+<script>
+  // Принудительно показываем редактор без проверки пароля
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('work').hidden = false;
+  });
+</script>
+<script src="js/editor.js"></script>
+</body>
+</html>

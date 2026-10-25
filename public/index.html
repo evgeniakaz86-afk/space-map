@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пространство | Интерактивные карты</title>
+    
+    <!-- ✅ Подключаем Pannellum для 3D-панорам -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                <span>Карта Пространства</span>
+            </div>
+            <div class="header-actions">
+                <span class="badge">v2.0</span>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <!-- БЛОК 1: 2D-КАРТА -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2>1. 2D-Схема (Локации и Этажи)</h2>
+                </div>
+                
+                <div class="toolbar">
+                    <select id="locSelect" onchange="switchLoc()" class="custom-select"></select>
+                    <select id="floorSelect" onchange="switchFloor()" class="custom-select"></select>
+                    
+                    <div class="toolbar-group">
+                        <button onclick="addLocation()" class="btn btn-secondary">+ Добавить</button>
+                        <button onclick="editLocation()" class="btn btn-secondary">✎ Изменить</button>
+                        <button onclick="deleteLocation()" class="btn btn-danger">Удалить</button>
+                    </div>
+                </div>
+                
+                <div class="toolbar" style="margin-top: 16px;">
+                    <label class="file-upload">
+                        <input type="file" id="imageLoader" accept="image/*">
+                        <span class="btn btn-outline">Выбрать файл</span>
+                    </label>
+                    <button onclick="autoGeneratePlan()" class="btn btn-primary">✨ Сгенерировать 2D</button>
+                </div>
+                
+                <p class="hint-text">Выберите локацию и этаж. Кликните по схеме, чтобы поставить точку.</p>
+                
+                <div id="mapArea" class="map-container">
+                    <img id="planImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="План">
+                    <svg id="routeSvg"></svg>
+                    <div id="tooltip" class="custom-tooltip"></div>
+                </div>
+
+                <div class="route-panel">
+                    <h3>Навигация по объекту</h3>
+                    <div class="toolbar">
+                        <div class="select-group">
+                            <span class="label">Откуда:</span>
+                            <select id="startPoint" class="custom-select"></select>
+                        </div>
+                        <div class="select-group">
+                            <span class="label">Куда:</span>
+                            <select id="endPoint" class="custom-select"></select>
+                        </div>
+                    </div>
+                    <div class="toolbar" style="margin-top: 16px;">
+                        <button onclick="drawRoute()" class="btn btn-primary">Проложить маршрут</button>
+                        <button onclick="clearRoute()" class="btn btn-secondary">Сбросить</button>
+                    </div>
+                </div>
+
+                <!-- БЛОК ПУБЛИКАЦИИ -->
+                <div class="toolbar" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--glass-border);">
+                    <button onclick="publishMap()" class="btn btn-success" style="background: #10B981;">🚀 Опубликовать карту</button>
+                    <button onclick="copyLink()" class="btn btn-secondary">📋 Скопировать ссылку</button>
+                </div>
+                <p id="publishLink" style="color: #10B981; font-weight: 500; margin-top: 12px; word-break: break-all;"></p>
+            </section>
+
+            <!-- БЛОК 2: 3D-ПАНОРАМЫ -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2>2. 3D Панорамы</h2>
+                </div>
+                <div class="toolbar">
+                    <label class="file-upload">
+                        <input type="file" id="panoLoader" accept="image/*" multiple>
+                        <span class="btn btn-outline">Выбрать файлы</span>
+                    </label>
+                    <button onclick="uploadPanoramas()" class="btn btn-primary">Загрузить панорамы</button>
+                    <button onclick="stitchPanorama()" class="btn btn-success" style="background: #10B981;">✨ Склеить в панораму</button>
+                </div>
+                
+                <h3>Список панорам:</h3>
+                <ul id="panoList" class="pano-list"></ul>
+                
+                <div class="toolbar" style="margin-top: 24px;">
+                    <button onclick="startCamera()" class="btn btn-secondary">Включить камеру</button>
+                    <button onclick="stopCamera()" class="btn btn-secondary">Выключить</button>
+                </div>
+                <div id="cameraView" class="camera-container">
+                    <video id="video" autoplay playsinline></video>
+                    <!-- Обновленная кнопка затвора для 360 съемки -->
+                    <div class="shutter" id="shutterBtn" onclick="startPanoCapture()" style="display: flex; align-items: center; justify-content: center; color: black; font-weight: bold; font-size: 12px; text-align: center;">Старт<br>360</div>
+                    <!-- Индикатор статуса съемки -->
+                    <div id="captureStatus" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 10px; display: none; white-space: nowrap; z-index: 100;"></div>
+                </div>
+            </section>
+
+            <!-- БЛОК 3: СТАТИСТИКА -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2>3. Статистика</h2>
+                </div>
+                <button onclick="showStats()" class="btn btn-secondary">Обновить данные</button>
+                <pre id="statsBox" class="stats-terminal">Нажмите кнопку для загрузки...</pre>
+            </section>
+        </main>
+    </div>
+
+    <!-- 3D ОКНО (Теперь с Pannellum) -->
+    <div id="panoramaView">
+        <button class="close-pano" onclick="closePano()">Закрыть 3D</button>
+        <div id="panoContainer"></div>
+        <div id="hotspotContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100;"></div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-window">
+            <h3 id="modalTitle">Введите данные</h3>
+            <div id="modalInputs"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" id="modalConfirmBtn">Продолжить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем app.js как модуль -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
