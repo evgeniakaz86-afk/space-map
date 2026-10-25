@@ -2,7 +2,6 @@
 
 :root {
     --bg-main: #0B0F19;
-    /* Сделали фон панелей более прозрачным */
     --glass-bg: rgba(22, 30, 46, 0.35); 
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-highlight: rgba(255, 255, 255, 0.15);
@@ -43,7 +42,7 @@ body {
     width: 100vw; height: 100vh;
     z-index: 0;
     pointer-events: none;
-    opacity: 1; /* Сделали фон максимально ярким */
+    opacity: 1;
 }
 
 .app-container {
@@ -85,11 +84,10 @@ body {
     border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
-/* --- GLASS PANELS (БОЛЕЕ ПРОЗРАЧНЫЕ) --- */
+/* --- GLASS PANELS --- */
 .glass-panel {
     position: relative;
     background: var(--glass-bg);
-    /* Увеличили размытие, чтобы текст читался на фоне созвездий */
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--glass-border);
@@ -217,7 +215,7 @@ h3 {
     color: var(--primary-color);
 }
 
-/* --- ЭФФЕКТ ВОЛНЫ ПРИ КЛИКЕ --- */
+/* --- RIPPLE EFFECT --- */
 .ripple {
     position: absolute;
     border-radius: 50%;
@@ -278,7 +276,6 @@ button, .btn {
     padding: 6px 12px;
 }
 
-/* Скрываем стандартный инпут файла */
 .file-upload input[type="file"] {
     display: none;
 }
@@ -369,21 +366,95 @@ button, .btn {
 /* --- PANO LIST --- */
 .pano-list {
     list-style: none;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 12px;
     margin-top: 16px;
 }
 
 .pano-list li {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 12px 16px;
-    border-radius: var(--radius-sm);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-md);
     border: 1px solid var(--glass-border);
+    transition: all 0.2s;
+}
+
+.pano-list li:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pano-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.pano-name {
+    font-weight: 500;
     font-size: 14px;
+    color: var(--text-primary);
+}
+
+.pano-select {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    outline: none;
+    max-width: 200px;
+}
+
+.pano-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.btn-icon.btn-edit:hover {
+    color: #60A5FA;
+    border-color: #60A5FA;
+    background: rgba(59, 130, 246, 0.15);
+}
+
+.btn-icon.btn-delete:hover {
+    color: #F87171;
+    border-color: #F87171;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.btn-icon.btn-view:hover {
+    color: #34D399;
+    border-color: #34D399;
+    background: rgba(16, 185, 129, 0.15);
 }
 
 /* --- TERMINAL --- */
@@ -454,7 +525,7 @@ video { width: 100%; height: 100%; object-fit: cover; }
 }
 .close-pano:hover { background: rgba(255, 255, 255, 0.2); }
 
-/* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
+/* --- MOBILE ADAPTATION --- */
 @media (max-width: 600px) {
     .app-container { padding: 20px 12px; }
     .glass-panel { padding: 20px; }
@@ -466,7 +537,7 @@ video { width: 100%; height: 100%; object-fit: cover; }
     .select-group { flex-direction: column; align-items: stretch; }
 }
 
-/* --- СТРЕЛКИ В 3D ПАНОРАМЕ --- */
+/* --- HOTSPOTS --- */
 .hotspot {
     position: absolute;
     width: 50px; 
@@ -491,7 +562,7 @@ video { width: 100%; height: 100%; object-fit: cover; }
     background: rgba(59, 130, 246, 1);
 }
 
-/* --- КРАСИВОЕ МОДАЛЬНОЕ ОКНО --- */
+/* --- MODAL --- */
 .modal-overlay {
     display: none;
     position: fixed;

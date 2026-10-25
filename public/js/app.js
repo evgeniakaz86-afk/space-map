@@ -6,6 +6,7 @@ let stats = { views: 0, pointClicks: {} };
 let currentLocId = null;
 let currentFloor = 1;
 let cameraPhotos = [];
+let publishedMapId = null; // ID опубликованной карты для статистики
 
 const planImg = document.getElementById('planImg');
 const mapArea = document.getElementById('mapArea');
@@ -14,7 +15,7 @@ const endPoint = document.getElementById('endPoint');
 const locSelect = document.getElementById('locSelect');
 const floorSelect = document.getElementById('floorSelect');
 
-// --- УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО ---
+// --- МОДАЛЬНОЕ ОКНО ---
 function openModal(title, inputs, onConfirm) {
     const modal = document.getElementById('customModal');
     const modalTitle = document.getElementById('modalTitle');
@@ -313,7 +314,7 @@ function renderPoints() {
     });
 }
 
-// --- МАРШРУТ ---
+// --- МАРШРУТ (ПОЛНЫЙ АЛГОРИТМ A*) ---
 function updateDropdowns() {
     startPoint.innerHTML = '<option value="">Выберите...</option>';
     endPoint.innerHTML = '<option value="">Выберите...</option>';
@@ -534,16 +535,42 @@ function renderPanoramaList() {
             }
         });
         li.innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <span>${p.name}</span>
-                <select onchange="setPanoHotspot('${p.id}', this.value)" style="font-size:12px; padding:4px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 4px;">
+            <div class="pano-info">
+                <span class="pano-name">${p.name}</span>
+                <select class="pano-select" onchange="setPanoHotspot('${p.id}', this.value)">
                     ${options}
                 </select>
             </div>
-            <button class="secondary" onclick="openPano('${p.id}')" style="padding: 5px;">👁</button>
+            <div class="pano-actions">
+                <button class="btn-icon btn-view" onclick="openPano('${p.id}')" title="Смотреть">👁</button>
+                <button class="btn-icon btn-edit" onclick="renamePano('${p.id}')" title="Переименовать">✎</button>
+                <button class="btn-icon btn-delete" onclick="deletePano('${p.id}')" title="Удалить">✖</button>
+            </div>
         `;
         list.appendChild(li);
     });
+}
+
+function renamePano(panoId) {
+    const pano = panoramas.find(p => p.id === panoId);
+    if (!pano) return;
+    
+    openModal('Переименовать панораму', [
+        { id: 'newPanoName', placeholder: 'Новое название', type: 'text', value: pano.name }
+    ], (data) => {
+        if (data.newPanoName) {
+            pano.name = data.newPanoName;
+            renderPanoramaList();
+            saveState();
+        }
+    });
+}
+
+function deletePano(panoId) {
+    if (!confirm('Удалить эту панораму?')) return;
+    panoramas = panoramas.filter(p => p.id !== panoId);
+    renderPanoramaList();
+    saveState();
 }
 
 function setPanoHotspot(panoId, targetId) {
@@ -554,7 +581,7 @@ function setPanoHotspot(panoId, targetId) {
     }
 }
 
-// --- ПРОСМОТР КВАДРАТНОЙ ПАНОРАМЫ (Pannellum) ---
+// --- ПРОСМОТР ПАНОРАМЫ (Pannellum) ---
 function openPano(panoId) {
     const pano = panoramas.find(p => p.id === panoId);
     if (!pano) return;
@@ -601,9 +628,41 @@ function updateStatsUI() {
     const el = document.getElementById('viewCount');
     if (el) el.innerText = stats.views;
 }
-function showStats() {
+
+async function showStats() {
     const box = document.getElementById('statsBox');
-    if (box) box.innerText = `Просмотров: ${stats.views}\nТочек: ${points.length}`;
+    box.innerText = 'Загрузка статистики...';
+    
+    // Используем ID опубликованной карты, если он есть
+    const mapIdForStats = publishedMapId || currentLocId;
+    
+    if (!mapIdForStats) {
+        box.innerText = 'Сначала создайте и опубликуйте карту.';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/maps/${mapIdForStats}/stats`);
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.error || 'Ошибка');
+        
+        let text = `📊 Общая статистика по карте:\n`;
+        text += `Всего просмотров страницы: ${data.total}\n\n`;
+        
+        text += `👁 Открытия панорам:\n`;
+        if (data.panoViews && data.panoViews.length > 0) {
+            data.panoViews.forEach(p => {
+                text += `- ${p.url.split('/').pop()}: ${p.count} раз(а)\n`;
+            });
+        } else {
+            text += `Пока нет данных.\n`;
+        }
+
+        box.innerText = text;
+    } catch (e) {
+        box.innerText = `Ошибка загрузки статистики: ${e.message}`;
+    }
 }
 
 let videoStream = null;
@@ -730,6 +789,10 @@ async function publishMap() {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
+        
+        // СОХРАНЯЕМ ID ОПУБЛИКОВАННОЙ КАРТЫ ДЛЯ СТАТИСТИКИ
+        publishedMapId = result.mapId;
+        
         const link = `${window.location.origin}/viewer.html?map=${result.mapId}`;
         const linkElement = document.getElementById('publishLink');
         if (linkElement) {
@@ -880,3 +943,5 @@ window.showStats = showStats;
 window.closeModal = closeModal;
 window.publishMap = publishMap;
 window.copyLink = copyLink;
+window.renamePano = renamePano;
+window.deletePano = deletePano;

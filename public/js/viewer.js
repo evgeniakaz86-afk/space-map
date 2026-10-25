@@ -2,69 +2,24 @@ let mapData = null;
 let currentLocId = null;
 let currentFloor = 1;
 
-const planImg = document.getElementById('planImg');
-const mapArea = document.getElementById('mapArea');
-const startPoint = document.getElementById('startPoint');
-const endPoint = document.getElementById('endPoint');
-const locSelect = document.getElementById('locSelect');
-const floorSelect = document.getElementById('floorSelect');
-
-// Универсальный API запрос
-const api = async (u) => {
-    const r = await fetch(u);
-    if (!r.ok) throw new Error('Ошибка загрузки');
-    return r.json();
-};
-
 window.onload = async function () {
     const urlParams = new URLSearchParams(window.location.search);
     const mapId = urlParams.get('map');
 
     if (!mapId) {
-        document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">Ошибка: Карта не найдена (нет ID в ссылке)</h1>';
+        document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">Ошибка: Карта не найдена</h1>';
         return;
     }
 
     try {
-        const data = await api('/api/public/maps/' + mapId);
-        mapData = data;
+        const response = await fetch('/api/public/maps/' + mapId);
+        mapData = await response.json();
 
-        // Если есть здания, формируем локации
-        if (data.buildings && data.buildings.length > 0) {
-            const mainLoc = {
-                id: 'main',
-                name: data.title,
-                floors: data.floors || 1,
-                plans: { 1: data.plan_url }
-            };
-            for (let i = 2; i <= (data.floors || 1); i++) {
-                mainLoc.plans[i] = data.plan_url;
-            }
-            mapData.locations = [mainLoc];
-        } else {
-            // Если зданий нет, но есть панорамы, делаем одну локацию "По умолчанию"
-            mapData.locations = [{
-                id: 'main',
-                name: data.title || 'Обзор',
-                floors: 1,
-                plans: { 1: data.plan_url || '' }
-            }];
-        }
-
-        // Привязываем точки и панорамы к локации 'main'
-        mapData.points = (data.points || []).map(p => ({
-            ...p,
-            locId: 'main',
-            floor: p.floor || 1
-        }));
-        mapData.panoramas = (data.panoramas || []).map(p => ({
-            ...p,
-            locId: 'main',
-            hotspots: []
-        }));
-
-        if (mapData.locations.length > 0) {
+        if (mapData.locations && mapData.locations.length > 0) {
             currentLocId = mapData.locations[0].id;
+        } else {
+            mapData.locations = [{ id: 'main', name: 'Обзор', floors: 1, plans: {} }];
+            currentLocId = 'main';
         }
 
         renderLocations();
@@ -72,18 +27,16 @@ window.onload = async function () {
 
     } catch (e) {
         console.error(e);
-        document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">Ошибка: ' + e.message + '</h1>';
+        document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">Ошибка загрузки данных</h1>';
     }
 };
 
 // --- ЛОКАЦИИ ---
 function renderLocations() {
+    const locSelect = document.getElementById('locSelect');
+    const floorSelect = document.getElementById('floorSelect');
+    
     if (!mapData || !mapData.locations) return;
-
-    if (mapData.locations.length === 0) {
-        locSelect.innerHTML = '<option value="">Нет данных</option>';
-        return;
-    }
 
     locSelect.innerHTML = '';
     mapData.locations.forEach(l => {
@@ -101,13 +54,13 @@ function renderLocations() {
 }
 
 function switchLoc() {
-    currentLocId = locSelect.value;
+    currentLocId = document.getElementById('locSelect').value;
     currentFloor = 1;
     renderLocations();
 }
 
 function switchFloor() {
-    currentFloor = +floorSelect.value;
+    currentFloor = +document.getElementById('floorSelect').value;
     switchFloorOrLoc();
 }
 
@@ -116,6 +69,7 @@ function switchFloorOrLoc() {
     const loc = mapData.locations.find(l => l.id === currentLocId);
     if (!loc) return;
 
+    const planImg = document.getElementById('planImg');
     const plan = loc.plans ? loc.plans[currentFloor] : null;
     planImg.src = plan ? plan : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
@@ -126,55 +80,68 @@ function switchFloorOrLoc() {
 
 // --- ТОЧКИ ---
 function renderPoints() {
+    const mapArea = document.getElementById('mapArea');
     document.querySelectorAll('.point').forEach(el => el.remove());
-    if (!mapData || !currentLocId) return;
+    
+    if (!mapData || !mapData.points) return;
 
-    const filteredPoints = mapData.points.filter(p => p.locId === currentLocId && p.floor === currentFloor);
-
-    filteredPoints.forEach(p => {
-        const el = document.createElement('div');
-        el.className = 'point';
-        el.style.left = p.x + '%';
-        el.style.top = p.y + '%';
-
-        el.onmouseenter = () => {
-            const tooltip = document.getElementById('tooltip');
-            tooltip.style.display = 'block';
-            tooltip.innerText = p.name + (p.desc ? ': ' + p.desc : '');
-            tooltip.style.left = p.x + '%';
-            tooltip.style.top = p.y + '%';
-        };
-        el.onmouseleave = () => document.getElementById('tooltip').style.display = 'none';
-
-        el.onclick = (e) => {
-            e.stopPropagation();
-            alert(p.name + '\n' + (p.desc || 'Описание отсутствует'));
-        };
-
-        mapArea.appendChild(el);
+    mapData.points.forEach(p => {
+        if (p.locId === currentLocId && p.floor === currentFloor) {
+            const el = document.createElement('div');
+            el.className = 'point';
+            el.style.left = p.x + '%';
+            el.style.top = p.y + '%';
+            
+            el.onmouseenter = () => {
+                const tooltip = document.getElementById('tooltip');
+                tooltip.style.display = 'block';
+                tooltip.innerText = p.name + (p.desc ? ': ' + p.desc : '');
+                tooltip.style.left = p.x + '%';
+                tooltip.style.top = p.y + '%';
+            };
+            el.onmouseleave = () => document.getElementById('tooltip').style.display = 'none';
+            
+            el.onclick = (e) => {
+                e.stopPropagation();
+                alert(p.name + '\n' + (p.desc || 'Описание отсутствует'));
+            };
+            
+            mapArea.appendChild(el);
+        }
     });
 }
 
-// --- МАРШРУТ ---
+// --- МАРШРУТ (СПИСКИ) ---
 function updateDropdowns() {
+    const startPoint = document.getElementById('startPoint');
+    const endPoint = document.getElementById('endPoint');
+    
     startPoint.innerHTML = '<option value="">Выберите...</option>';
     endPoint.innerHTML = '<option value="">Выберите...</option>';
-    if (!mapData || !currentLocId) return;
+    
+    if (!mapData || !mapData.points) return;
 
-    const filteredPoints = mapData.points.filter(p => p.locId === currentLocId && p.floor === currentFloor);
-
-    filteredPoints.forEach(p => {
-        startPoint.innerHTML += `<option value="${p.id}">${p.name}</option>`;
-        endPoint.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    mapData.points.forEach(p => {
+        if (p.locId === currentLocId && p.floor === currentFloor) {
+            startPoint.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+            endPoint.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+        }
     });
 }
 
+// --- МАРШРУТ (ПОЛНЫЙ АЛГОРИТМ A*) ---
 function drawRoute() {
-    if (!mapData) return;
+    if (!mapData || !mapData.points) return;
+    
+    const startPoint = document.getElementById('startPoint');
+    const endPoint = document.getElementById('endPoint');
+    
     const s = mapData.points.find(p => p.id == startPoint.value);
     const e = mapData.points.find(p => p.id == endPoint.value);
+    
     if (!s || !e) return alert('Выберите две точки!');
 
+    const planImg = document.getElementById('planImg');
     const rect = planImg.getBoundingClientRect();
     if (rect.width === 0) return alert('Сначала загрузите картинку плана!');
 
@@ -374,157 +341,58 @@ function drawRoute() {
     };
 }
 
-function clearRoute() { document.getElementById('routeSvg').innerHTML = ''; }
+function clearRoute() { 
+    document.getElementById('routeSvg').innerHTML = ''; 
+}
 
 // --- ПАНОРАМЫ ---
 function renderPanoramaList() {
     const list = document.getElementById('panoList');
     if (!list) return;
     list.innerHTML = '';
-    if (!mapData) return;
-
-    const locPanoramas = mapData.panoramas.filter(p => p.locId === currentLocId);
-
-    if (locPanoramas.length === 0) {
+    
+    if (!mapData || !mapData.panoramas || mapData.panoramas.length === 0) {
         list.innerHTML = '<li>Нет панорам.</li>';
         return;
     }
 
-    locPanoramas.forEach((p) => {
+    mapData.panoramas.forEach(pano => {
         const li = document.createElement('li');
         li.innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <span>Панорама</span>
+            <div class="pano-info">
+                <span class="pano-name">${pano.name || 'Панорама'}</span>
             </div>
-            <button class="secondary" onclick="openPano('${p.id}')" style="padding: 5px;">👁</button>
+            <div class="pano-actions">
+                <button class="btn-icon btn-view" onclick="openPano('${pano.url}')" title="Смотреть">👁</button>
+            </div>
         `;
         list.appendChild(li);
     });
 }
 
-// ============================================================
-// === 3D-ПАНОРАМА (исправленная версия) ===
-// ============================================================
-let renderer, scene, camera, sphere, isDragging = false, prevX = 0, prevY = 0;
-let panoRAF = null;
-
-function openPano(panoId) {
-    if (!mapData) return;
-    const pano = mapData.panoramas.find(p => p.id === panoId);
-    if (!pano) return;
+function openPano(url) {
+    if (typeof pannellum === 'undefined') {
+        alert('Ошибка: Библиотека 3D-панорам не загружена.');
+        return;
+    }
 
     document.getElementById('panoramaView').style.display = 'block';
     const container = document.getElementById('panoContainer');
-    const hotspotContainer = document.getElementById('hotspotContainer');
-
-    if (!renderer) {
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        container.appendChild(renderer.domElement);
-
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        camera.position.set(0, 0, 0);
-
-        const geo = new THREE.SphereGeometry(500, 64, 64);
-        const mat = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
-        sphere = new THREE.Mesh(geo, mat);
-        scene.add(sphere);
-
-        const start = (e) => {
-            isDragging = true;
-            const p = e.touches ? e.touches[0] : e;
-            prevX = p.clientX; prevY = p.clientY;
-        };
-        const move = (e) => {
-            if (!isDragging) return;
-            const p = e.touches ? e.touches[0] : e;
-            const dx = p.clientX - prevX;
-            const dy = p.clientY - prevY;
-            camera.rotation.y -= dx * 0.005;
-            camera.rotation.x -= dy * 0.005;
-            camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-            prevX = p.clientX; prevY = p.clientY;
-            if (e.cancelable) e.preventDefault();
-        };
-        const end = () => { isDragging = false; };
-
-        container.addEventListener('mousedown', start);
-        container.addEventListener('mousemove', move);
-        container.addEventListener('mouseup', end);
-        container.addEventListener('touchstart', start, { passive: true });
-        container.addEventListener('touchmove', move, { passive: false });
-        container.addEventListener('touchend', end);
-        window.addEventListener('mouseup', end);
-
-        const resize = () => {
-            const w = container.clientWidth, h = container.clientHeight;
-            if (!w || !h) return;
-            renderer.setSize(w, h, false);
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-        };
-        window.addEventListener('resize', resize);
-        window.addEventListener('orientationchange', resize);
-        requestAnimationFrame(resize);
-    }
-
-    const w = container.clientWidth, h = container.clientHeight;
-    if (w && h) {
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-    }
-
-    camera.rotation.set(0, 0, 0);
-
-    const loader = new THREE.TextureLoader();
-    loader.load(
-        pano.url,
-        (tex) => {
-            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-            if (sphere.material.map) sphere.material.map.dispose();
-            sphere.material.map = tex;
-            sphere.material.needsUpdate = true;
-            renderer.render(scene, camera);
-        },
-        undefined,
-        (err) => {
-            console.error('Panorama load error:', err);
-            alert('Не удалось загрузить панораму: ' + pano.url);
-        }
-    );
-
-    if (panoRAF) cancelAnimationFrame(panoRAF);
-    const animate = () => {
-        renderer.render(scene, camera);
-        panoRAF = requestAnimationFrame(animate);
-    };
-    animate();
-
-    hotspotContainer.innerHTML = '';
-    if (pano.hotspots && pano.hotspots.length > 0) {
-        const targetPano = mapData.panoramas.find(p => p.id === pano.hotspots[0]);
-        if (targetPano) {
-            const arrow = document.createElement('div');
-            arrow.className = 'hotspot';
-            arrow.innerHTML = '→';
-            arrow.title = 'Перейти к: ' + targetPano.name;
-            arrow.style.left = '50%';
-            arrow.style.top = '50%';
-            arrow.onclick = () => openPano(targetPano.id);
-            hotspotContainer.appendChild(arrow);
-        }
-    }
+    container.innerHTML = '<div id="pannellum-viewer" style="width:100%; height:100%;"></div>';
+    
+    pannellum.viewer('pannellum-viewer', {
+        "type": "equirectangular",
+        "panorama": url,
+        "autoLoad": true,
+        "showControls": true
+    });
 }
 
 function closePano() {
     document.getElementById('panoramaView').style.display = 'none';
-    document.getElementById('hotspotContainer').innerHTML = '';
-    if (panoRAF) { cancelAnimationFrame(panoRAF); panoRAF = null; }
+    document.getElementById('panoContainer').innerHTML = '';
 }
 
-// Экспорт для HTML
 window.switchLoc = switchLoc;
 window.switchFloor = switchFloor;
 window.drawRoute = drawRoute;
